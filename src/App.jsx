@@ -1,135 +1,83 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import './App.css'
-import Input from './components/input'
+import RequestMethodDropdown from './components/request/RequestMethodDropdown'
+import RequestUriInput from './components/request/RequestUriInput';
+import SendRequestButton from './components/request/SendRequestButton'
+import ResponseArea from './components/response/ResponseArea'
+import useFetch from './hooks/useFetch'
+import OutputFormatButton from './components/response/OutputFormatButton';
 
 const initialState = {
   status: 'idle',
   request: {
     method: 'GET',
-    uri: ''
-  }
+    uri: 'https://dummyjson.com/products',
+    body: {}
+  },
+  response: {}
 }
 
 const App = () => {
   const [state, setState] = useState(initialState)
-  const [response, setResponse] = useState('')
+  const [outputFormat, setOutputFormat] = useState('Raw')
+
+  const updateState = (key, value) => {
+    if (typeof value === 'string') {
+      setState((prev) => ({ ...prev, [key]: value }))
+    } else if (typeof value === 'object') {
+      const updatedVal = Object.assign({ ...state[key] }, value)
+      setState((prev) => ({ ...prev, [key]: updatedVal}))
+    } else {
+      console.log('Unsupported value type for key "' + key + '": ' + typeof value)
+    }
+  }
+
+  useFetch(state, updateState);
+
+  const { status, request, response } = state
+
+  const formatOptions = [
+    "Raw", "Pretty Print", "Visualize"
+  ]
+
   return (
     <>
-    <RequestMethodDropdown state={state} setState={setState} />
-    <RequestUriInput state={state} setState={setState} />
-    <SendRequestButton state={state} setState={setState} setResponse={setResponse} />
-    <br />
-    <br />
-    <ServerResponseTextarea response={response} />
+      <div className="wrapper">
+        <h1>API Visualizer</h1>
+        <div className="request-input">
+          <RequestMethodDropdown initialValue={request.method} status={status} updateState={updateState} />
+          <RequestUriInput initialValue={request.uri} status={status} updateState={updateState} />
+          <SendRequestButton state={state} updateState={updateState} />
+        </div>
+
+        <ResponseArea response={response} outputFormat={outputFormat} />
+
+        <div style={{
+          display: 'flex'
+        }}>
+          {formatOptions.map(format => (
+            <OutputFormatButton 
+              key={format} 
+              className="" 
+              text={format} 
+              onClick={(e) => setOutputFormat(e.target.textContent)} />
+          ))}
+        </div>
+
+        <div className="state-output">
+          {Object.entries(state).map(([k, v]) => {
+            return (
+              <div key={k}>
+                <strong>{k}:</strong> {typeof v === 'object'? JSON.stringify(v) : v}
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </>
   )
 }
 
-const RequestMethodDropdown = ({ state, setState }) => {
-  const handleChange = (e) => {
-    setState({
-      ...state,
-      request: {
-        ...state.request,
-        method: e.target.value
-      }
-    })
-  }
 
-  const requestMethods = [
-    'GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'
-  ]
-
-  return (
-    <select id="methodDropdown" onChange={handleChange}>
-      {requestMethods.map((o, i) => 
-        <option key={i} value={o}>{o}</option>
-      )}
-    </select>
-  )
-}
-
-const RequestUriInput = ({ state, setState }) => {
-  const handleChange = (e) => {
-    setState({
-      ...state,
-      request: {
-       ...state.request,
-        uri: e.target.value
-      }
-    })
-  };
-
-  return (
-    <Input placeholder="Enter a URI" className="uriInput" onChange={handleChange} />
-  )
-}
-
-const SendRequestButton = ({ state, setState, setResponse }) => {
-  const handleClick = (e) => {
-    console.log(state);
-    setState({
-      ...state,
-      status: 'busy',
-      request: {
-       ...state.request
-      }
-    })
-  };
-
-  useEffect(() => {
-    const fetchData = async () => {
-      if (state.status === 'busy' && state.request.uri && state.request.method) {
-        const uri = state.request.uri;
-        const method = state.request.method;
-        const headers = {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache',
-          'Accept': '*/*',
-          'Accept-Encoding': 'gzip,deflate,br',
-          'Connection': 'keep-alive',
-          'Authorization': 'Bearer ' + process.env.BEARER_TOKEN,
-        };
-  
-        try {
-          const response = await fetch(uri, {
-            method: method,
-            headers: headers,
-          });
-
-          if (!response.ok) {
-            throw new Error(`Network response was not ok: ${response.statusText}`);
-          }
-  
-          const data = await response.json();
-          setResponse(JSON.stringify(data)); // Stringify for display in the textarea
-        } catch (error) {
-          console.error('Fetch error:', error);
-          setResponse('Error fetching data: ' + error.message);
-        } finally {
-          setState({
-            ...state,
-            status: 'idle',
-            request: {
-              ...state.request
-            }
-          });
-        }
-      }
-    };
-  
-    fetchData();
-  }, [state, setState, setResponse]);
-
-  return (
-    <button id="sendRequestButton" onClick={handleClick}>Send</button>
-  )
-}
-
-const ServerResponseTextarea = ({ response }) => {
-  return (
-    <textarea id="serverResponseTextarea" cols="50" rows="10" value={response} readOnly />
-  )
-}
 
 export default App
